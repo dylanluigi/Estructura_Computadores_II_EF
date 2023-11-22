@@ -1,8 +1,8 @@
 ; -----------------------------------------------------------------------------
 ; CONSTANTS
 ; -----------------------------------------------------------------------------
-SCRWIDTH    EQU     640*2                     ; DESIRED SCREEN WIDTH
-SCRHEIGH    EQU     480*2                     ; DESIRED SCREEN HEIGHT
+SCRWIDTH    EQU     640                     ; DESIRED SCREEN WIDTH
+SCRHEIGH    EQU     480                     ; DESIRED SCREEN HEIGHT
 SQRSIDE     EQU     64                      ; SIDE OF THE SQUARE TO DRAW
 SQRBCHAN    EQU     128                     ; SQUARE BLUE CHANNEL VALUE
 DELTA       EQU     1                       ; AMOUNT TO MOVE THE SQUARE BY EACH FRAME
@@ -104,7 +104,6 @@ DRSQUARE
             MOVEM.L (A7)+,D1-D6             ; RESTORE REGISTERS
             RTS
 
-; -----------------------------------------------------------------------------
 CHECK_KEYS
 ; Check for 'W', 'A', 'S', 'D' key presses and update square position
 ; -----------------------------------------------------------------------------
@@ -112,23 +111,37 @@ CHECK_KEYS
             MOVE.L  #'W'<<24+'A'<<16+'S'<<8+'D',D1 ; CHECK FOR 'W', 'A', 'S', 'D'
             TRAP    #15
             
-            MOVE.W  XPOS,D3                 ; LOAD CURRENT X POSITION
-            MOVE.W  YPOS,D4                 ; LOAD CURRENT Y POSITION
+            MOVE.W  XPOS,D3                 ; LOAD CURRENT X POSITION (Center X)
+            MOVE.W  YPOS,D4                 ; LOAD CURRENT Y POSITION (Center Y)
             BTST.L  #24,D1                  ; CHECK 'W'
             BEQ     NO_W
             SUB.W   #DELTA,D4               ; MOVE UP BY 'DELTA' PIXELS
+            CMP.W   #SQRSIDE/2,D4           ; CHECK IF AT TOP BORDER
+            BGE     NO_W                    ; IF NOT AT TOP, SKIP TO NEXT CHECK
+            MOVE.W  #SQRSIDE/2,D4           ; OTHERWISE, RESET Y POSITION TO TOP BORDER
 NO_W        BTST.L  #16,D1                  ; CHECK 'A'
             BEQ     NO_A
             SUB.W   #DELTA,D3               ; MOVE LEFT BY 'DELTA' PIXELS
+            CMP.W   #SQRSIDE/2,D3           ; CHECK IF AT LEFT BORDER
+            BGE     NO_A                    ; IF NOT AT LEFT, SKIP TO NEXT CHECK
+            MOVE.W  #SQRSIDE/2,D3           ; OTHERWISE, RESET X POSITION TO LEFT BORDER
 NO_A        BTST.L  #8,D1                   ; CHECK 'S'
             BEQ     NO_S
             ADD.W   #DELTA,D4               ; MOVE DOWN BY 'DELTA' PIXELS
+            CMP.W   #SCRHEIGH-SQRSIDE/2,D4  ; CHECK IF AT BOTTOM BORDER
+            BLE     NO_S                    ; IF NOT AT BOTTOM, SKIP TO NEXT CHECK
+            MOVE.W  #SCRHEIGH-SQRSIDE/2,D4  ; OTHERWISE, RESET Y POSITION TO BOTTOM BORDER
 NO_S        BTST.L  #0,D1                   ; CHECK 'D'
             BEQ     NO_D
             ADD.W   #DELTA,D3               ; MOVE RIGHT BY 'DELTA' PIXELS
+            CMP.W   #SCRWIDTH-SQRSIDE/2,D3  ; CHECK IF AT RIGHT BORDER
+            BLE     NO_D                    ; IF NOT AT RIGHT, SKIP TO NEXT CHECK
+            MOVE.W  #SCRWIDTH-SQRSIDE/2,D3  ; OTHERWISE, RESET X POSITION TO RIGHT BORDER
 NO_D        MOVE.W  D3,XPOS                 ; STORE UPDATED X POSITION
             MOVE.W  D4,YPOS                 ; STORE UPDATED Y POSITION
             RTS
+
+
 
           
 

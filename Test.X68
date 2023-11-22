@@ -3,9 +3,15 @@
 ; -----------------------------------------------------------------------------
 SCRWIDTH    EQU     640                     ; DESIRED SCREEN WIDTH
 SCRHEIGH    EQU     480                     ; DESIRED SCREEN HEIGHT
+MID_X       EQU     SCRWIDTH/2              ; MIDPOINT X COORDINATE
+MID_Y       EQU     SCRHEIGH/2              ; MIDPOINT Y COORDINATE
 SQRSIDE     EQU     64                      ; SIDE OF THE SQUARE TO DRAW
 SQRBCHAN    EQU     128                     ; SQUARE BLUE CHANNEL VALUE
 DELTA       EQU     1                       ; AMOUNT TO MOVE THE SQUARE BY EACH FRAME
+RED_COLOR    EQU     $00FF0000               ; RED COLOR
+ORANGE_COLOR EQU     $00FFA500               ; ORANGE COLOR
+YELLOW_COLOR EQU     $00FFFF00               ; YELLOW COLOR
+GREEN_COLOR  EQU     $00008000               ; GREEN COLOR
 
             ORG     $1000
             
@@ -35,26 +41,25 @@ MAIN_LOOP
             MOVE.W  #$FF00,D1
             TRAP    #15
 
+            ; Call subroutine to paint background
+            JSR     PAINT_BACKGROUND
+
             ; Check for key presses and update position if necessary
             JSR     CHECK_KEYS
 
             ; Get the updated position from variables
             MOVE.W  XPOS,D1                 ; GET CURRENT X POSITION
             MOVE.W  YPOS,D2                 ; GET CURRENT Y POSITION
-
-            ; Draw the square at the updated position
+            MOVE.L  #$00FF00FF,D0
             MOVE.W  #SQRSIDE,D3             ; SQUARE SIDE
-            MOVE.B  #SQRBCHAN,D0            ; SQUARE BLUE CHANNEL VALUE
             JSR     DRSQUARE                ; DRAW SQUARE
 
             ; Copy the off-screen buffer to the on-screen buffer
             MOVE.B  #94,D0                  ; REPAINT SCREEN TASK
             TRAP    #15                     ; COPY BUFFER TO SCREEN
 
-
-
-
             BRA     MAIN_LOOP               ; REPEAT LOOP
+
 
 ; -----------------------------------------------------------------------------
 INIT
@@ -104,41 +109,104 @@ DRSQUARE
             MOVEM.L (A7)+,D1-D6             ; RESTORE REGISTERS
             RTS
 
-CHECK_KEYS
-; Check for 'W', 'A', 'S', 'D' key presses and update square position
 ; -----------------------------------------------------------------------------
+; Subroutine to check key presses and update position
+; -----------------------------------------------------------------------------
+CHECK_KEYS
+            MOVEM.L D1-D7/A0-A1,-(A7)       ; Save registers on the stack
+
             MOVE.B  #19,D0                  ; TASK NUMBER FOR CHECKING KEYS
             MOVE.L  #'W'<<24+'A'<<16+'S'<<8+'D',D1 ; CHECK FOR 'W', 'A', 'S', 'D'
-            TRAP    #15
+            TRAP    #15                     ; Call the keyboard check task
             
-            MOVE.W  XPOS,D3                 ; LOAD CURRENT X POSITION (Center X)
-            MOVE.W  YPOS,D4                 ; LOAD CURRENT Y POSITION (Center Y)
-            BTST.L  #24,D1                  ; CHECK 'W'
+            MOVE.W  XPOS,D3                 ; Load current X position
+            MOVE.W  YPOS,D4                 ; Load current Y position
+
+            ; Check if 'W' is pressed
+            BTST    #24,D1
             BEQ     NO_W
-            SUB.W   #DELTA,D4               ; MOVE UP BY 'DELTA' PIXELS
-            CMP.W   #SQRSIDE/2,D4           ; CHECK IF AT TOP BORDER
-            BGE     NO_W                    ; IF NOT AT TOP, SKIP TO NEXT CHECK
-            MOVE.W  #SQRSIDE/2,D4           ; OTHERWISE, RESET Y POSITION TO TOP BORDER
-NO_W        BTST.L  #16,D1                  ; CHECK 'A'
-            BEQ     NO_A
-            SUB.W   #DELTA,D3               ; MOVE LEFT BY 'DELTA' PIXELS
-            CMP.W   #SQRSIDE/2,D3           ; CHECK IF AT LEFT BORDER
-            BGE     NO_A                    ; IF NOT AT LEFT, SKIP TO NEXT CHECK
-            MOVE.W  #SQRSIDE/2,D3           ; OTHERWISE, RESET X POSITION TO LEFT BORDER
-NO_A        BTST.L  #8,D1                   ; CHECK 'S'
+            SUB.W   #DELTA,D4               ; Move up
+            CMP.W   #SQRSIDE/2,D4
+            BGE     NO_W
+            MOVE.W  #SQRSIDE/2,D4           ; Correct position at top edge
+NO_W        
+            ; Check if 'S' is pressed
+            BTST    #8,D1
             BEQ     NO_S
-            ADD.W   #DELTA,D4               ; MOVE DOWN BY 'DELTA' PIXELS
-            CMP.W   #SCRHEIGH-SQRSIDE/2,D4  ; CHECK IF AT BOTTOM BORDER
-            BLE     NO_S                    ; IF NOT AT BOTTOM, SKIP TO NEXT CHECK
-            MOVE.W  #SCRHEIGH-SQRSIDE/2,D4  ; OTHERWISE, RESET Y POSITION TO BOTTOM BORDER
-NO_S        BTST.L  #0,D1                   ; CHECK 'D'
+            ADD.W   #DELTA,D4               ; Move down
+            CMP.W   #SCRHEIGH-SQRSIDE/2,D4
+            BLE     NO_S
+            MOVE.W  #SCRHEIGH-SQRSIDE/2,D4  ; Correct position at bottom edge
+NO_S        
+            ; Check if 'A' is pressed
+            BTST    #16,D1
+            BEQ     NO_A
+            SUB.W   #DELTA,D3               ; Move left
+            CMP.W   #SQRSIDE/2,D3
+            BGE     NO_A
+            MOVE.W  #SQRSIDE/2,D3           ; Correct position at left edge
+NO_A        
+            ; Check if 'D' is pressed
+            BTST    #0,D1
             BEQ     NO_D
-            ADD.W   #DELTA,D3               ; MOVE RIGHT BY 'DELTA' PIXELS
-            CMP.W   #SCRWIDTH-SQRSIDE/2,D3  ; CHECK IF AT RIGHT BORDER
-            BLE     NO_D                    ; IF NOT AT RIGHT, SKIP TO NEXT CHECK
-            MOVE.W  #SCRWIDTH-SQRSIDE/2,D3  ; OTHERWISE, RESET X POSITION TO RIGHT BORDER
-NO_D        MOVE.W  D3,XPOS                 ; STORE UPDATED X POSITION
-            MOVE.W  D4,YPOS                 ; STORE UPDATED Y POSITION
+            ADD.W   #DELTA,D3               ; Move right
+            CMP.W   #SCRWIDTH-SQRSIDE/2,D3
+            BLE     NO_D
+            MOVE.W  #SCRWIDTH-SQRSIDE/2,D3  ; Correct position at right edge
+NO_D        
+            MOVE.W  D3,XPOS                 ; Store updated X position
+            MOVE.W  D4,YPOS                 ; Store updated Y position
+
+            MOVEM.L (A7)+,D1-D7/A0-A1       ; Restore registers from the stack
+            RTS                             ; Return from subroutine
+
+
+PAINT_BACKGROUND
+            MOVEM.L D1-D6,-(A7)             ; STORE REGISTERS
+            ; Top left quadrant (RED)
+            MOVE.L  #RED_COLOR,D1           ; Set fill color to RED
+            MOVE.B  #81,D0                  ; Set fill color task
+            TRAP    #15
+            MOVE.W  #0,D1                   ; Upper left X
+            MOVE.W  #0,D2                   ; Upper left Y
+            MOVE.W  #MID_X-1,D3             ; Lower right X (midpoint minus one)
+            MOVE.W  #MID_Y-1,D4             ; Lower right Y (midpoint minus one)
+            MOVE.B  #87,D0                  ; Draw rectangle task
+            TRAP    #15
+
+            ; Top right quadrant (ORANGE)
+            MOVE.L  #ORANGE_COLOR,D1        ; Set fill color to ORANGE
+            MOVE.B  #81,D0                  ; Set fill color task
+            TRAP    #15
+            MOVE.W  #MID_X,D1               ; Upper left X (midpoint)
+            MOVE.W  #0,D2                   ; Upper left Y
+            MOVE.W  #SCRWIDTH-1,D3          ; Lower right X (full width minus one)
+            MOVE.W  #MID_Y-1,D4             ; Lower right Y (midpoint minus one)
+            MOVE.B  #87,D0                  ; Draw rectangle task
+            TRAP    #15
+
+            ; Bottom left quadrant (YELLOW)
+            MOVE.L  #YELLOW_COLOR,D1        ; Set fill color to YELLOW
+            MOVE.B  #81,D0                  ; Set fill color task
+            TRAP    #15
+            MOVE.W  #0,D1                   ; Upper left X
+            MOVE.W  #MID_Y,D2               ; Upper left Y (midpoint)
+            MOVE.W  #MID_X-1,D3             ; Lower right X (midpoint minus one)
+            MOVE.W  #SCRHEIGH-1,D4          ; Lower right Y (full height minus one)
+            MOVE.B  #87,D0                  ; Draw rectangle task
+            TRAP    #15
+
+            ; Bottom right quadrant (GREEN)
+            MOVE.L  #GREEN_COLOR,D1         ; Set fill color to GREEN
+            MOVE.B  #81,D0                  ; Set fill color task
+            TRAP    #15
+            MOVE.W  #MID_X,D1               ; Upper left X (midpoint)
+            MOVE.W  #MID_Y,D2               ; Upper left Y (midpoint)
+            MOVE.W  #SCRWIDTH-1,D3          ; Lower right X (full width minus one)
+            MOVE.W  #SCRHEIGH-1,D4          ; Lower right Y (full height minus one)
+            MOVE.B  #87,D0                  ; Draw rectangle task
+            TRAP    #15
+            MOVEM.L (A7)+,D1-D6             ; RESTORE REGISTERS
             RTS
 
 

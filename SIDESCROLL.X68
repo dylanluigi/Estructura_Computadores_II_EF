@@ -12,11 +12,14 @@ RED_COLOR   EQU     $000000FF               ; RED COLOR
 ORANGE_COLOR EQU     $00FFA500               ; ORANGE COLOR
 YELLOW_COLOR EQU     $00FFFF00               ; YELLOW COLOR
 GREEN_COLOR  EQU     $00008000               ; GREEN COLOR
+BLUE_COLOR  EQU     $00FF0000
 BAR_HEIGHT   EQU     20                      ; HEIGHT OF EACH BAR
 NUM_BARS     EQU     SCRHEIGH / BAR_HEIGHT   ; TOTAL NUMBER OF BARS
 PATTERN_WIDTH   EQU     960    ; Example width, can be adjusted
 RECT_WIDTH    EQU     SCRWIDTH*2           ; Width of the rectangle
 RECT_HEIGHT   EQU     SCRHEIGH               ; Height of the rectangle (same as the screen height)
+SCROLL_OFFSET  EQU     200    ; Example offset value, adjust as needed
+
 
 
             ORG     $1000
@@ -53,20 +56,22 @@ MAIN_LOOP
             MOVE.W  #$FF00,D1
             TRAP    #15
 
-            ; Call subroutine to paint background
-            JSR     PAINT_BACKGROUND
-
+           
             ; Check for key presses and update position if necessary
             JSR     CHECK_KEYS
 
+            ; Call subroutine to paint background
+            JSR     PAINT_BACKGROUND
+            
             ; Get the updated position from variables
             MOVE.W  XPOS,D1                 ; GET CURRENT X POSITION
             MOVE.W  YPOS,D2                 ; GET CURRENT Y POSITION
             MOVE.L  #$00FF00FF,D0
             MOVE.W  #SQRSIDE,D3             ; SQUARE SIDE
+            
             JSR     DRSQUARE                ; DRAW SQUARE
-
-            ; Copy the off-screen buffer to the on-screen buffer
+           
+            
             MOVE.B  #94,D0                  ; REPAINT SCREEN TASK
             TRAP    #15                     ; COPY BUFFER TO SCREEN
 
@@ -135,8 +140,8 @@ CHECK_KEYS
             ; Check if 'A' is pressed for left movement
             BTST    #16,D1
             BEQ     NO_A
-            CMP.W   #MID_X,D3
-            BLS     MOVE_LEFT               ; If square is not at midpoint, move left
+            CMP.W   #SCROLL_OFFSET,D3       ; Check if within scroll offset
+            BHI     MOVE_LEFT               ; If outside scroll offset, move left
             JSR     SCROLL_BACKGROUND_LEFT  ; Otherwise, adjust background to the right
             BRA     NO_A
 
@@ -150,8 +155,8 @@ NO_A:
             ; Check if 'D' is pressed for right movement
             BTST    #0,D1
             BEQ     NO_D
-            CMP.W   #MID_X,D3
-            BLS     MOVE_RIGHT              ; If square is not at midpoint, move right
+            CMP.W   #(SCRWIDTH - SCROLL_OFFSET),D3 ; Check if within scroll offset
+            BLT     MOVE_RIGHT              ; If outside scroll offset, move right
             JSR     SCROLL_BACKGROUND_RIGHT ; Otherwise, adjust background to the left
             BRA     NO_D
 
@@ -219,4 +224,4 @@ SCROLL_BACKGROUND_LEFT:
     RTS                                        ; Return from subroutine
 
 
-            END     START    ꉊāG剆預ˑʨ¹                                                                                                                                                                                                                    
+            END     START  ☨|剆ᥰ˖ʨ¹                                                                                                                                                                                                                           

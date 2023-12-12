@@ -19,6 +19,7 @@ PATTERN_WIDTH   EQU     960    ; Example width, can be adjusted
 RECT_WIDTH    EQU     SCRWIDTH*2           ; Width of the rectangle
 RECT_HEIGHT   EQU     SCRHEIGH               ; Height of the rectangle (same as the screen height)
 SCROLL_OFFSET  EQU     200    ; Example offset value, adjust as needed
+FRAME_DELAY    EQU     5                       ; MOVE SQUARE EVERY 'FRAME_DELAY' FRAMES
 
 
 
@@ -30,6 +31,7 @@ SCROLL_OFFSET  EQU     200    ; Example offset value, adjust as needed
 XPOS        DS.W    1                       ; VARIABLE TO STORE X POSITION
 YPOS        DS.W    1                       ; VARIABLE TO STORE Y POSITION
 BG_OFFSET    DS.W    1                       ; BACKGROUND OFFSET FOR SCROLLING
+FRAME_COUNTER DS.W  1                       ; VARIABLE TO COUNT FRAMES
 
 
 ; -----------------------------------------------------------------------------
@@ -41,6 +43,7 @@ START
             MOVE.B  #92,D0
             TRAP    #15
             
+            MOVE.W  #0,FRAME_COUNTER        ; INITIALIZE FRAME COUNTER            
             MOVE.W  #0,BG_OFFSET                        ; INITIALIZE BACKGROUND OFFSET
 
             ; Set Drawing Mode to Normal
@@ -137,6 +140,12 @@ CHECK_KEYS
             MOVE.W  XPOS,D3                 ; Load current X position
             MOVE.W  YPOS,D4                 ; Load current Y position
 
+            MOVE.W  FRAME_COUNTER,D5        ; Load frame counter
+            ADD.W   #1,D5                   ; Increment frame counter
+            CMP.W   #FRAME_DELAY,D5         ; Check if it's time to move
+            BLO     SKIP_MOVEMENT           ; Skip movement if not enough frames have passed
+            MOVE.W  #0,D5                   ; Reset frame counter
+
             ; Check if 'A' is pressed for left movement
             BTST    #16,D1
             BEQ     NO_A
@@ -169,6 +178,9 @@ MOVE_RIGHT:
 NO_D:        
             MOVE.W  D3,XPOS                 ; Store updated X position
             MOVE.W  D4,YPOS                 ; Store updated Y position
+
+SKIP_MOVEMENT:
+            MOVE.W  D5,FRAME_COUNTER        ; Store updated frame counter
 
             MOVEM.L (A7)+,D1-D7/A0-A1       ; Restore registers from the stack
             RTS                             ; Return from subroutine
@@ -224,4 +236,4 @@ SCROLL_BACKGROUND_LEFT:
     RTS                                        ; Return from subroutine
 
 
-            END     START  ☨|剆ᥰ˖ʨ¹                                                                                                                                                                                                                           
+            END     START

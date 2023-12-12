@@ -20,7 +20,11 @@ RECT_WIDTH    EQU     SCRWIDTH*2           ; Width of the rectangle
 RECT_HEIGHT   EQU     SCRHEIGH               ; Height of the rectangle (same as the screen height)
 SCROLL_OFFSET  EQU     200    ; Example offset value, adjust as needed
 FRAME_DELAY    EQU     5                       ; MOVE SQUARE EVERY 'FRAME_DELAY' FRAMES
-
+GROUND_HEIGHT  EQU     450                      ; HEIGHT OF THE GROUND
+GROUND_COLOR   EQU     $008B4513               ; BROWN COLOR FOR GROUND
+INITIAL_JUMP_VELOCITY  EQU     -15             ; INITIAL VELOCITY FOR JUMP (NEGATIVE FOR UPWARDS)
+GRAVITY                EQU     1               ; GRAVITY TO APPLY EACH FRAME
+GROUND_Y               EQU     SCRHEIGH - GROUND_HEIGHT ; Y POSITION OF THE GROUND
 
 
             ORG     $1000
@@ -32,13 +36,16 @@ XPOS        DS.W    1                       ; VARIABLE TO STORE X POSITION
 YPOS        DS.W    1                       ; VARIABLE TO STORE Y POSITION
 BG_OFFSET    DS.W    1                       ; BACKGROUND OFFSET FOR SCROLLING
 FRAME_COUNTER DS.W  1                       ; VARIABLE TO COUNT FRAMES
+VERT_VELOCITY    DS.W    1                       ; VERTICAL VELOCITY FOR JUMPING
+IS_JUMPING       DS.W    1                       ; JUMP STATE FLAG
+GRAVITY_COUNTER   DS.W    1 
 
 
 ; -----------------------------------------------------------------------------
 START
             JSR     INIT                    ; INITIALIZE SCREEN
-            MOVE.W  #SCRWIDTH/2,XPOS        ; INITIALIZE X POSITION (CENTER)
-            MOVE.W  #SCRHEIGH/2,YPOS        ; INITIALIZE Y POSITION (CENTER)
+            MOVE.W  #MID_X,XPOS               ; INITIALIZE X POSITION (CENTER)
+            MOVE.W  #GROUND_Y-SQRSIDE,YPOS    ; INITIALIZE Y POSITION (ON TOP OF THE GROUND)
             MOVE.B  #17,D1  ; Set drawing mode to double buffering
             MOVE.B  #92,D0
             TRAP    #15
@@ -146,6 +153,47 @@ CHECK_KEYS
             BLO     SKIP_MOVEMENT           ; Skip movement if not enough frames have passed
             MOVE.W  #0,D5                   ; Reset frame counter
 
+            ; Check if 'W' is pressed for jump
+            BTST    #24,D1
+            BEQ     NO_JUMP
+            MOVE.W  IS_JUMPING,D6             ; Check if already jumping
+            BEQ     START_JUMP
+            BRA     NO_JUMP
+
+
+START_JUMP:
+            MOVE.W  #INITIAL_JUMP_VELOCITY,VERT_VELOCITY  ; Set initial jump velocity (negative for upwards)
+            MOVE.W  #1,IS_JUMPING                        ; Set jumping flag
+            MOVE.W  #0,GRAVITY_COUNTER                   ; Reset gravity counter
+            BRA     SKIP_MOVEMENT
+
+NO_JUMP:
+            ; Handle jumping physics
+            MOVE.W  IS_JUMPING,D6                       ; Check if jumping
+            BEQ     NOT_JUMPING
+            MOVE.W  VERT_VELOCITY,D7                    ; Move vertical velocity to a register
+            ADD.W   D7,YPOS                              ; Apply vertical velocity to Y position (upwards)
+            MOVE.W  GRAVITY_COUNTER,D0                  ; Load gravity counter
+            ADD.W   #1,D0                               ; Increment gravity counter
+            AND.W   #2,D0                               ; Apply gravity every 3 frames
+            BEQ     APPLY_GRAVITY
+            BRA     SKIP_GRAVITY
+
+APPLY_GRAVITY:
+            ADD.W   #GRAVITY,VERT_VELOCITY              ; Apply gravity to vertical velocity
+            MOVE.W  #0,GRAVITY_COUNTER                  ; Reset gravity counter
+
+SKIP_GRAVITY:
+            CMP.W   #GROUND_Y-SQRSIDE,YPOS              ; Check if landed (bottom edge)
+            BGE     LANDED
+            BRA     SKIP_MOVEMENT
+
+LANDED:
+            MOVE.W  #GROUND_Y-SQRSIDE,YPOS              ; Correct Y position if below ground
+            MOVE.W  #0,IS_JUMPING                       ; Reset jumping flag
+            MOVE.W  #0,VERT_VELOCITY    
+
+NOT_JUMPING:
             ; Check if 'A' is pressed for left movement
             BTST    #16,D1
             BEQ     NO_A
@@ -177,7 +225,7 @@ MOVE_RIGHT:
 
 NO_D:        
             MOVE.W  D3,XPOS                 ; Store updated X position
-            MOVE.W  D4,YPOS                 ; Store updated Y position
+                             ; Store updated Y position
 
 SKIP_MOVEMENT:
             MOVE.W  D5,FRAME_COUNTER        ; Store updated frame counter
@@ -189,27 +237,33 @@ SKIP_MOVEMENT:
 PAINT_BACKGROUND
             MOVEM.L D1-D6,-(A7)               ; STORE REGISTERS
 
-        
-
             MOVE.L  #RED_COLOR,D1             ; Set fill color to red
             MOVE.B  #81,D0                    ; Set fill color task
             TRAP    #15
 
-            MOVE.L  #ORANGE_COLOR,D0                 ; Set pen color to white
-            MOVE.B  #80,D0                    ; Set pen color task
-            TRAP    #15
-            
+            ; Draw the background rectangle
             MOVE.W  BG_OFFSET,D1              ; Load background offset
             MOVE.W  #0,D2                     ; Upper Y is always 0
             MOVE.W  D1,D3                     ; Lower X is BG_OFFSET + RECT_WIDTH
             ADD.W   #RECT_WIDTH,D3
             MOVE.W  #RECT_HEIGHT,D4           ; Lower Y is the height of the rectangle
+            MOVE.B  #87,D0                    ; Draw filled rectangle task
+            TRAP    #15
 
+            ; Draw the ground rectangle
+            MOVE.L  #GROUND_COLOR,D1          ; Set fill color to brown for ground
+            MOVE.B  #81,D0                    ; Set fill color task
+            TRAP    #15
+            MOVE.W  #0,D1                     ; Left X is 0
+            MOVE.W  #GROUND_HEIGHT,D2    ; Upper Y is screen height minus ground height
+            MOVE.W  #SCRWIDTH,D3              ; Right X is screen width
+            MOVE.W  #SCRHEIGH,D4              ; Lower Y is screen height
             MOVE.B  #87,D0                    ; Draw filled rectangle task
             TRAP    #15
 
             MOVEM.L (A7)+,D1-D6               ; RESTORE REGISTERS
             RTS
+
 
 
 
